@@ -61,22 +61,52 @@ class View():
         self.buttonRD = ttk.Button(self.root, text="Browse")
         self.buttonRD.grid(row=1, column=3, padx=5, pady=5)
 
+        self.defaultVariableTPText = 'Software Builds'
         self.variableTP = tk.StringVar(self.root)
-        self.variableTP.set("Test Procedure") 
+        self.variableTP.set(self.defaultVariableTPText) 
 
         self.optionMenuTP = tk.OptionMenu(self.root, self.variableTP, None)
         self.optionMenuTP.grid(row=2, column=0, padx=5, pady=5)
 
+        self.defaultVariableSBText = 'Test Procedure'
         self.variableSB = tk.StringVar(self.root)
-        self.variableSB.set("Software Build")
+        self.variableSB.set(self.defaultVariableSBText)
 
         self.optionMenuSB = tk.OptionMenu(self.root, self.variableSB, None)
         self.optionMenuSB.grid(row=2, column=1, padx=5, pady=5)
+        
+        self.radioButton = tk.IntVar()
+        self.radioButton.set(1)
+
+        self.defaultRadioButtonType1 = "Type 1"
+        self.radioButtonType1 = tk.Radiobutton(root, 
+               text=self.defaultRadioButtonType1,
+               padx = 5, 
+               pady = 5,
+               variable=self.radioButton, 
+               value=1)
+        self.radioButtonType1.grid(row=2, column=2, padx=5, pady=5)
+
+        self.defaultRadioButtonType2 = "Type 2"
+        self.radioButtonType2 = tk.Radiobutton(root, 
+               text=self.defaultRadioButtonType2,
+               variable=self.radioButton, 
+               value=2)
+        self.radioButtonType2.grid(row=2, column=3, padx=5, pady=5)
+        
+        self.checkButton = tk.IntVar()
+        self.checkButtonErase = tk.Checkbutton(root, text='Erase',variable=self.checkButton, onvalue=1, offvalue=0)
+        self.checkButtonErase.grid(row=3, column=0, padx=5, pady=5)
+        
+        self.buttonExecute = tk.Button(root, text ="OK")
+        self.buttonExecute.grid(row=3, column=3, padx=5, pady=5)
+
 
     def getTPDEntry(self):
         return self.entryTPD.get()
-
-
+    
+    def getRDEntry(self):
+        return self.entryRD.get()
 
 class Controller():
     def __init__(self, model, view):
@@ -93,18 +123,28 @@ class Controller():
     def updateRDEntry(self):
         self.view.entryRD.delete(1, tk.END)
         self.view.entryRD.insert(0, fd.askdirectory())
+        self.updateSBOptionMenu()
+        
+    def getSBs(self):
+        return [f.path for f in os.scandir(self.view.getRDEntry()) if f.is_dir()]
 
     def getTPs(self):
         return [f for f in glob.glob("%s/*.py" % self.view.getTPDEntry())]
-	
 
     def updateTPOptionMenu(self):
         menu = self.view.optionMenuTP["menu"]
         menu.delete(0, "end")
-        for string in self.getTPs():
-            print(string)
-            menu.add_command(label=string, command=lambda value=string: self.view.variableTP.set(value))
-	
+        for string in [self.view.defaultVariableTPText] + self.getTPs():
+            basename = os.path.basename(string)
+            menu.add_command(label=basename, command=lambda value=basename: self.view.variableTP.set(value))
+            
+    def updateSBOptionMenu(self):
+        menu = self.view.optionMenuSB["menu"]
+        menu.delete(0, "end")
+        for string in [self.view.defaultVariableSBText] + self.getSBs():
+            basename = os.path.basename(string)
+            menu.add_command(label=basename, command=lambda value=basename: self.view.variableSB.set(value))       
+    
 
 if __name__ == '__main__':
     root = tk.Tk()
