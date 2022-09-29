@@ -4,28 +4,47 @@ import sqlite3 as sql
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
+from tkinter import messagebox
 
 class Model():
     def __init__(self):
-        self.con = sql.connect('.cache.db')
+        self.database = os.path.dirname(os.path.abspath(__file__)) + "/.cache.db"
+        self.con = sql.connect(self.database)
         self.cur = self.con.cursor()
         self.initTable()
         
     def initTable(self):
-        #self.cur.execute("CREATE TABLE IF NOT EXISTS Settings (tpDir TEXT, tpName TEXT, rDir TEXT, rName TEXT, update BOOLEAN, type BOOLEAN)")
+        self.cur.execute("CREATE TABLE IF NOT EXISTS settings (key varchar PRIMARY KEY, value varchar NOT NULL);")
         self.con.commit()
 
-    def addDataToTable(self):
+    def addDataToTable(self, settings):
+        for setting in settings:
+            self.cur.execute("INSERT INTO settings (key, value) VALUES (?, ?);", setting)
         self.con.commit()
 
-    def deleteDataFromTable(self):
+    def deleteDataFromTable(self, keys):
+        for key in keys:
+            self.cur.execute("DELETE FROM settings WHERE key = ?;", [key])
         self.con.commit()
-
-    def updateDataInTable(self):
-        #self.cur.execute('Update settings Set tpdir = @tpdir, tpname = @tpname, rdir = @rdir, rname = @rname, update = @update, type = @type')
+        
+    def getDataFromTable(self, keys):
+        values = []
+        for key in keys:
+            self.cur.execute("SELECT value FROM settings WHERE key = ?;", [key])
+            values.append(self.cur.fetchone())
         self.con.commit()
+        return values
+    
+    def getAllDataFromTable(self):
+        self.cur.execute("SELECT * FROM settings;")
+        values = self.cur.fetchall()
+        self.con.commit()
+        return values
 
-    def getDataFromTable(self):
+    def updateDataInTable(self, settings):
+        for setting in settings:
+            print(setting)
+            self.cur.execute("UPDATE settings SET value = ? WHERE key = ?;", setting)
         self.con.commit()
 
 class View():
@@ -78,42 +97,141 @@ class View():
         self.radioButton = tk.IntVar()
         self.radioButton.set(1)
 
-        self.defaultRadioButtonType1 = "Type 1"
-        self.radioButtonType1 = tk.Radiobutton(root, 
-               text=self.defaultRadioButtonType1,
-               padx = 5, 
-               pady = 5,
-               variable=self.radioButton, 
-               value=1)
+        self.radioButtonType1 = tk.Radiobutton(self.root, text="Type 1", variable=self.radioButton, value=1)
         self.radioButtonType1.grid(row=2, column=2, padx=5, pady=5)
 
-        self.defaultRadioButtonType2 = "Type 2"
-        self.radioButtonType2 = tk.Radiobutton(root, 
-               text=self.defaultRadioButtonType2,
-               variable=self.radioButton, 
-               value=2)
+        self.radioButtonType2 = tk.Radiobutton(self.root, text="Type 2", variable=self.radioButton, value=2)
         self.radioButtonType2.grid(row=2, column=3, padx=5, pady=5)
         
         self.checkButton = tk.IntVar()
-        self.checkButtonErase = tk.Checkbutton(root, text='Erase',variable=self.checkButton, onvalue=1, offvalue=0)
+        self.checkButtonErase = tk.Checkbutton(self.root, text='Erase',variable=self.checkButton, onvalue=1, offvalue=0)
         self.checkButtonErase.grid(row=3, column=0, padx=5, pady=5)
         
-        self.buttonExecute = tk.Button(root, text ="OK")
+        self.buttonExecute = tk.Button(self.root, text ="OK")
         self.buttonExecute.grid(row=3, column=3, padx=5, pady=5)
 
 
     def getTPDEntry(self):
         return self.entryTPD.get()
     
+    def setTPDEntry(self,value):
+        self.entryTPD.delete(0,"end")
+        self.entryTPD.insert(0,value)
+    
     def getRDEntry(self):
         return self.entryRD.get()
+    
+    def setRDEntry(self,value):
+        self.entryRD.delete(0,"end")
+        self.entryRD.insert(0,value)
+    
+    def getOptionsMenuTP(self):
+        return self.variableTP.get()
+    
+    def setOptionsMenuTP(self, value):
+        self.variableTP.set(value)
+    
+    def getOptionsMenuSB(self):
+        return self.variableSB.get()
+    
+    def setOptionsMenuSB(self, value):
+        self.variableSB.set(value)
+    
+    def getRadioButton(self):
+        return self.radioButton.get()
+    
+    def setRadioButton(self, value):
+        self.radioButton.set(value)
+    
+    def getCheckButton(self):
+        return self.checkButton.get()
+    
+    def setCheckButton(self, value):
+        self.checkButton.set(value)
 
 class Controller():
     def __init__(self, model, view):
         self.model = model
         self.view = view
+        
+        self.view.root.protocol("WM_DELETE_WINDOW", self.deleteFun)
+
         self.view.buttonTPD["command"] = self.updateTPDEntry
         self.view.buttonRD["command"] = self.updateRDEntry
+        self.view.buttonExecute["command"] = self.setup
+        
+        self.loadSettings()
+        
+    def deleteFun(self):
+        if messagebox.askokcancel("Quit", "Do you want to quit?"):
+            self.saveSettings()
+            self.model.cur.close()
+            self.view.root.destroy()
+   
+    def loadSettings(self):
+        result = self.model.getDataFromTable(["entryTPD"])
+        if result[0] is not None and len(result[0][0]) > 0:
+                self.view.setTPDEntry(result[0])
+                
+        result = self.model.getDataFromTable(["entryRD"])
+        if result[0] is not None and len(result[0][0]) > 0:
+                self.view.setRDEntry(result[0])
+                
+#        result = self.model.getDataFromTable(["checkButton"])
+#        if result[0] is not None and len(result[0][0]) > 0:
+#                self.view.setCheckButton(result[0])
+    
+    def saveSettings(self):
+        key = "entryTPD"
+        value = self.view.getTPDEntry()
+        result = self.model.getDataFromTable([key])
+        if result[0] is not None:
+            self.model.updateDataInTable([(value, key)])
+        else:
+            self.model.addDataToTable([(key, value)])
+            
+        key = "entryRD"
+        value = self.view.getRDEntry()
+        result = self.model.getDataFromTable([key])
+        if result[0] is not None:
+            self.model.updateDataInTable([(value, key)])
+        else:
+            self.model.addDataToTable([(key, value)])
+            
+        key = "checkButton"
+        value = self.view.getCheckButton()
+        result = self.model.getDataFromTable([key])
+        if result[0] is not None:
+            self.model.updateDataInTable([(value, key)])
+        else:
+            self.model.addDataToTable([(key, value)])
+            
+        key = "radioButton"
+        value = self.view.getRadioButton()
+        result = self.model.getDataFromTable([key])
+        if result[0] is not None:
+            self.model.updateDataInTable([(value, key)])
+        else:
+            self.model.addDataToTable([(key, value)])
+            
+        key = "optionsMenuSB"
+        value = self.view.getOptionsMenuSB()
+        result = self.model.getDataFromTable([key])
+        if result[0] is not None:
+            self.model.updateDataInTable([(value, key)])
+        else:
+            self.model.addDataToTable([(key, value)])
+                                                   
+        key = "optionsMenuTP"
+        value = self.view.getOptionsMenuTP()
+        result = self.model.getDataFromTable([key])
+        if result[0] is not None:
+            self.model.updateDataInTable([(value, key)])
+        else:
+            self.model.addDataToTable([(key, value)])                                                 
+                                                         
+    def setup(self):
+        print(self.view.getRadioButton())
 
     def updateTPDEntry(self):
         self.view.entryTPD.delete(1, tk.END)
